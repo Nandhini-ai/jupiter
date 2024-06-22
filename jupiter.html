@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hangman Game with Confetti</title>
+<style>
+  /* Variables */
+  :root {
+    --orange: #ffa600;
+    --green: #c1d72e;
+    --blue: #82d2e5;
+    --grey: #f3f3f3;
+    --white: #fff;
+    --base-color: var(--blue);
+  }
+
+  /* Mixins */
+  @mixin clear {
+    &:after {
+      content: "";
+      display:  table;
+      clear: both;
+    }
+  }
+
+  @mixin corners($radius) {
+    -moz-border-radius: $radius;
+    -webkit-border-radius: $radius;
+    border-radius: $radius;
+    -khtml-border-radius: $radius;
+  }
+
+  body {
+    background: var(--base-color);
+    font-family: "HelveticaNeue-Light", "Helvetica Neue Light", "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+    color: var(--white);
+    height: 100%;
+    text-align: center;
+    font-size: 18px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevents scrollbars */
+  }
+
+  .wrapper {
+    @include clear;
+    width: 100%;
+    margin: 0 auto;
+    max-width: 900px;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Roboto', sans-serif;
+    font-weight: 100;
+    text-transform: uppercase;
+    margin: 5px 0;
+  }
+
+  h1 {
+    font-size: 2.6em;
+  }
+
+  h2 {
+    font-size: 1.6em;
+  }
+
+  p {
+    font-size: 1.6em;
+    margin: 10px 0;
+  }
+
+  #buttons {
+    @include clear;
+    margin: 15px auto;
+    padding: 0;
+  }
+
+  #alphabet {
+    padding: 0;
+    list-style: none;
+  }
+
+  #alphabet li {
+    float: left;
+    margin: 0 10px 10px 0;
+    width: 35px;
+    height: 30px;
+    line-height: 30px;
+    text-align: center;
+    background: var(--white);
+    color: var(--base-color);
+    cursor: pointer;
+    @include corners(5px);
+    border: solid 1px var(--white);
+    transition: all 0.3s ease-in-out;
+  }
+
+  #alphabet li:hover {
+    background: var(--base-color);
+    border: solid 1px var(--white);
+    color: var(--white);
+  }
+
+  #hold {
+    margin: 20px auto;
+  }
+
+  #my-word {
+    padding: 0;
+    list-style: none;
+    font-size: 1.6em;
+  }
+
+  #my-word li {
+    display: inline-block;
+    padding: 0 10px;
+  }
+
+  #mylives {
+    font-size: 1.6em;
+    text-align: center;
+    margin: 10px 0;
+  }
+
+  button {
+    @include corners(5px);
+    background: var(--base-color);
+    color: var(--white);
+    border: solid 1px var(--white);
+    text-decoration: none;
+    cursor: pointer;
+    font-size: 1.2em;
+    padding: 18px 10px;
+    width: 180px;
+    margin: 10px;
+    outline: none;
+    transition: all 0.3s ease-in-out;
+  }
+
+  button:hover {
+    background: var(--white);
+    border: solid 1px var(--white);
+    color: var(--base-color);
+  }
+
+  canvas#confetti {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: -1;
+    display: block;
+    margin: 0;
+    padding: 0;
+    width: 100vw; /* Full width of viewport */
+    height: 100vh; /* Full height of viewport */
+  }
+
+  @media (max-width: 767px) {
+    #alphabet {
+      padding-left: 15px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    #alphabet {
+      padding-left: 25px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <h1>Thongu Pa Thongu Game</h1>
+  <p>Use the alphabet below to guess the word, or click hint to get a clue.</p>
+</div>
+<div class="wrapper">
+  <div id="buttons"></div>
+  <p id="catagoryName"></p>
+  <div id="hold"></div>
+  <p id="mylives">You have 10 lives</p>
+  <p id="clue">Clue: -</p>
+  <canvas id="stickman">This Text will show if the Browser does NOT support HTML5 Canvas tag</canvas>
+  <div class="container">
+    <button id="hint">Hint</button>
+    <button id="reset">Play again</button>
+  </div>
+</div>
+<script>
+  // Hangman Game Code
+  window.onload = function () {
+    var alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
+      'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+      't', 'u', 'v', 'w', 'x', 'y', 'z'];
+
+    var categories = [
+      ["Scooby Doo", "Tom and jerry", "Petter Parker", "Phineas", "Ninja hattori", "shinchan", "Doremon"],
+      ["Love today", "ayalaan", "bahubali", "comali", "Friends","doctor","vikram","boys"],
+      ["snapchat", "facebook", "instagram", "Sharechat", "google meet","telegram","pinterest","tiktok"]
+    ];
+
+    var chosenCategory;
+    var word;
+    var geusses = [];
+    var lives;
+    var counter;
+    var space;
+
+    var showLives = document.getElementById("mylives");
+    var catagoryName = document.getElementById("catagoryName");
+    var showClue = document.getElementById("clue");
+    
+
+    // Create alphabet buttons
+    var buttons = function () {
+      var myButtons = document.getElementById('buttons');
+      var letters = document.createElement('ul');
+      letters.id = 'alphabet';
+
+      for (var i = 0; i < alphabet.length; i++) {
+        var list = document.createElement('li');
+        list.innerHTML = alphabet[i];
+        list.onclick = check;
+        letters.appendChild(list);
+      }
+      myButtons.appendChild(letters);
+    };
+
+    // Select Category
+    var selectCat = function () {
+      var catIndex = categories.findIndex(cat => cat === chosenCategory);
+      if (catIndex === 0) {
+        catagoryName.innerHTML = "The Chosen Category Is cartoon";
+      } else if (catIndex === 1) {
+        catagoryName.innerHTML = "The Chosen Category Is Films";
+      } else if (catIndex === 2) {
+        catagoryName.innerHTML = "The Chosen Category Is social media apps";
+      }
+    };
+
+    // Create word placeholders
+    var result = function () {
+      var wordHolder = document.getElementById('hold');
+      var correct = document.createElement('ul');
+      correct.id = 'my-word';
+
+      for (var i = 0; i < word.length; i++) {
+        var guess = document.createElement('li');
+        guess.className = 'guess';
+        if (word[i] === "-") {
+          guess.innerHTML = "-";
+          space = 1;
+        } else {
+          guess.innerHTML = "_";
+        }
+        geusses.push(guess);
+        wordHolder.appendChild(correct);
+        correct.appendChild(guess);
+      }
+    };
+
+    // Show lives remaining
+    var comments = function () {
+      showLives.innerHTML = "You have " + lives + " lives";
+      if (lives < 1) {
+        showLives.innerHTML = "Game Over";
+      }
+      for (var i = 0; i < geusses.length; i++) {
+        if (counter + space === geusses.length) {
+          showLives.innerHTML = "You Win!";
+        }
+      }
+    };
+
+    // Animate hangman
+    var animate = function () {
+      var drawMe = lives;
+      drawArray[drawMe]();
+    };
+
+    // Canvas drawing functions
+    var canvas = function () {
+      var myStickman = document.getElementById("stickman");
+      var context = myStickman.getContext('2d');
+      context.beginPath();
+      context.strokeStyle = "#fff";
+      context.lineWidth = 2;
+    };
+
+    var head = function () {
+      var myStickman = document.getElementById("stickman");
+      var context = myStickman.getContext('2d');
+      context.beginPath();
+      context.arc(60, 25, 10, 0, Math.PI * 2, true);
+      context.stroke();
+    };
+
+    var draw = function ($pathFromx, $pathFromy, $pathTox, $pathToy) {
+      var context = document.getElementById("stickman").getContext('2d');
+      context.moveTo($pathFromx, $pathFromy);
+      context.lineTo($pathTox, $pathToy);
+      context.stroke();
+    };
+
+    var frame1 = function () {
+      draw(0, 150, 150, 150);
+    };
+
+    var frame2 = function () {
+      draw(10, 0, 10, 600);
+    };
+
+    var frame3 = function () {
+      draw(0, 5, 70, 5);
+    };
+
+    var frame4 = function () {
+      draw(60, 5, 60, 15);
+    };
+
+    var torso = function () {
+      draw(60, 36, 60, 70);
+    };
+
+    var rightArm = function () {
+      draw(60, 46, 100, 50);
+    };
+
+    var leftArm = function () {
+      draw(60, 46, 20, 50);
+    };
+
+    var rightLeg = function () {
+      draw(60, 70, 100, 100);
+    };
+
+    var leftLeg = function () {
+      draw(60, 70, 20, 100);
+    };
+
+    var drawArray = [rightLeg, leftLeg, rightArm, leftArm, torso, head, frame4, frame3, frame2, frame1];
+
+    // Check guessed letter
+    var check = function () {
+      var geuss = this.innerHTML;
+      var letterIndex = alphabet.indexOf(geuss);
+
+      // Disable the letter in the alphabet
+      if (letterIndex !== -1) {
+        alphabet.splice(letterIndex, 1); // Remove from alphabet
+        updateAlphabet(); // Update alphabet UI
+      }
+
+      this.setAttribute("class", "active");
+      var found = false;
+      for (var i = 0; i < word.length; i++) {
+        if (word[i] === geuss) {
+          geusses[i].innerHTML = geuss;
+          counter += 1;
+          found = true;
+        }
+      }
+      if (!found) {
+        lives -= 1;
+        comments();
+        animate();
+      } else {
+        comments();
+      }
+    };
+
+    // Update alphabet buttons
+    var updateAlphabet = function () {
+      var letters = document.getElementById('alphabet');
+      letters.innerHTML = '';
+      for (var i = 0; i < alphabet.length; i++) {
+        var list = document.createElement('li');
+        list.innerHTML = alphabet[i];
+        list.onclick = check;
+        letters.appendChild(list);
+      }
+    };
+
+    // Reset game
+    var resetGame = function () {
+      var correct = document.getElementById('my-word');
+      var letters = document.getElementById('alphabet');
+      correct.parentNode.removeChild(correct);
+      letters.parentNode.removeChild(letters);
+      showClue.innerHTML = "";
+      var context = document.getElementById("stickman").getContext('2d');
+      context.clearRect(0, 0, 400, 400);
+      play();
+    };
+
+    // Start game
+    var play = function () {
+      chosenCategory = categories[Math.floor(Math.random() * categories.length)];
+      word = chosenCategory[Math.floor(Math.random() * chosenCategory.length)];
+      word = word.replace(/\s/g, "-");
+      geusses = [];
+      lives = 10;
+      counter = 0;
+      space = 0;
+      alphabet = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h',
+        'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's',
+        't', 'u', 'v', 'w', 'x', 'y', 'z']; // Reset alphabet
+      buttons();
+      result();
+      comments();
+      selectCat();
+      canvas();
+    };
+
+    // Hint functionality
+    hint.onclick = function () {
+      var catIndex = categories.findIndex(cat => cat === chosenCategory);
+      var hintIndex = chosenCategory.indexOf(word);
+      showClue.innerHTML = "Clue: " + hints[catIndex][hintIndex];
+    };
+
+    // Initial game start
+    play();
+  };
+
+  // Confetti Animation Code
+  function startConfetti() {
+    const canvas = document.createElement('canvas');
+    document.body.appendChild(canvas);
+    const ctx = canvas.getContext('2d');
+
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.zIndex = '-1';
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const pieces = [];
+    const numberOfPieces = 200;
+
+    function Piece() {
+      this.x = Math.random() * canvas.width;
+      this.y = Math.random() * canvas.height - canvas.height;
+      this.rotation = Math.random() * 360;
+      this.radius = (Math.random() * 8) + 1;
+      this.color = `hsla(${Math.random() * 360}, 100%, 50%, 0.8)`;
+      this.speed = (Math.random() * 5) + 1;
+      this.opacity = Math.random();
+
+      this.update = function () {
+        this.y += this.speed;
+
+        if (this.opacity < 1) {
+          this.opacity += 0.01;
+        }
+
+        if (this.y >= canvas.height) {
+          this.y = 0 - this.radius;
+          this.x = Math.random() * canvas.width;
+        }
+      };
+
+      this.draw = function () {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation * Math.PI / 180);
+        ctx.scale(1, 1);
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = this.opacity;
+        ctx.fill();
+        ctx.restore();
+      };
+    }
+
+    function createPieces() {
+      for (let i = 0; i < numberOfPieces; i++) {
+        pieces.push(new Piece());
+      }
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      pieces.forEach(piece => {
+        piece.update();
+        piece.draw();
+      });
+
+      requestAnimationFrame(animate);
+    }
+
+    createPieces();
+    animate();
+  }
+
+  // Start confetti automatically
+  startConfetti();
+</script>
+</body>
+</html>
